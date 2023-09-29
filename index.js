@@ -1,7 +1,7 @@
 const gridNum = 5;
 const allNumbersTest = [
   22, 13, 17, 11, 0, 8, 2, 23, 4, 24, 21, 9, 14, 16, 7, 6, 10, 3, 18, 5, 1, 12,
-  20, 15, 19, 3, 15, 0, 2, 22, 9, 18, 13, 17, 5, 19, 8, 7, 25, 23, 20, 1, 10,
+  20, 15, 19, 3, 15, 0, 2, 22, 9, 18, 13, 17, 5, 19, 8, 7, 25, 23, 20, 11, 10,
   24, 4, 14, 21, 16, 12, 6, 14, 21, 17, 24, 4, 10, 16, 15, 9, 19, 18, 8, 23, 26,
   20, 22, 11, 13, 6, 5, 2, 0, 12, 3, 7,
 ];
@@ -168,69 +168,126 @@ const boardsTask = createArrOfArrs(
   createArrOfArrs(gridNum, allNumbersTask)
 );
 
-///////////////////////
-
-const removeElFromArr = (el, arr) =>
-  arr.includes(el) ? arr.splice(arr.indexOf(el), 1) : arr;
-
-const getSum = (arr) => arr.flat(Infinity).reduce((acc, el) => acc + el, 0);
+/////////////////////// service ////////
+const getSum = (arr) =>
+  arr.flat(Infinity).reduce((acc, el) => {
+    if (el > 0) {
+      return acc + el;
+    }
+    return acc;
+  }, 0);
 
 const getWinScore = (lastNum, arr) => lastNum * getSum(arr);
 
+const isCollumFilled = (board) => {
+  let res = [];
+  for (let i = 0; i < board.length; i++) {
+    res.push(board.every((arr) => arr[i] === -1));
+  }
+  return res.some((arr) => arr);
+};
+
 ///////////////solution//////////
 
-function getLastScore(numArr, boardsArr) {
-  let res = undefined;
+function getWinners(numArr, boardsArr) {
+  return new Promise((resolve) => {
+    let winners = [];
 
-  for (let i = 0; i <= numArr.length; i++) {
-    boardsArr.map((board) => {
-      board.forEach((arr) => {
-        removeElFromArr(numArr[i], arr);
+    for (let i = 0; i < numArr.length; i++) {
+      boardsArr.map((board, index) => {
+        // replace matched value with -1
+        const updatedBoard = board.map((arr) =>
+          arr.map((el) => (el === numArr[i] ? -1 : el))
+        );
+        boardsArr[index] = updatedBoard;
 
-        if (boardsArr.length === 1 && board.length === gridNum - 1) {
-          const lastNum = numArr[i];
-          res = getWinScore(lastNum, board);
-        }
+        // check and create winners objs
+        const isWinnerCol = isCollumFilled(updatedBoard);
+        const isWinnerRow = updatedBoard.some((arr) =>
+          arr.every((el) => el === -1)
+        );
 
-        if (arr.length === 0) {
-          removeElFromArr(arr, board);
-        }
-
-        if (board.length < 5 && boardsArr.length !== 1) {
-          removeElFromArr(board, boardsArr);
+        if (isWinnerRow || isWinnerCol) {
+          winners.push({
+            board: updatedBoard,
+            lastNum: numArr[i],
+            indexMain: index,
+          });
         }
       });
-    });
+    }
+    resolve(winners);
+  });
+}
 
-    if (res) return res;
+function getLastScore(winners) {
+  const uniqueIndex = {};
+
+  const winnersArr = winners.reduce((accumulator, item) => {
+    //find first occurrences of indexMain
+    const index = item.indexMain;
+    if (!uniqueIndex.hasOwnProperty(index)) {
+      uniqueIndex[index] = true;
+      accumulator.push(item);
+    }
+    return accumulator;
+  }, []);
+
+  const board = winnersArr[winnersArr.length - 1].board;
+  const lastNum = winnersArr[winnersArr.length - 1].lastNum;
+  return getWinScore(lastNum, board);
+}
+
+getWinners(drawNum, boards)
+  .then((winners) => getLastScore(winners))
+  .catch((error) => console.error("Error:", error));
+
+let RESULT;
+async function result() {
+  try {
+    const winners = await getWinners(drawNumTask, boardsTask);
+    const res = getLastScore(winners);
+    RESULT = res;
+    return RESULT;
+  } catch (error) {
+    console.error("Error:", error);
+    return null;
   }
 }
 
-console.log(getLastScore(drawNum, boards));
-const result = getLastScore(drawNumTask, boardsTask);
-console.log(result);
+async function postResult() {
+  await result();
+  const h1 = document.querySelector("h1");
+  h1.innerHTML = RESULT;
 
-const h1 = document.querySelector("h1");
-h1.innerHTML = result;
+  const url = "https://customer-api.krea.se/coding-tests/api/squid-game";
+  const data = {
+    answer: RESULT,
+    name: "Halyna Stepanenko",
+  };
+  await postData(url, data);
+}
 
-////////////verify answer
-const url = "https://customer-api.krea.se/coding-tests/api/squid-game";
-const data = {
-  answer: result,
-  name: "Halyna Stepanenko",
-};
+postResult();
 
-fetch(url, {
-  method: "POST",
-  body: JSON.stringify(data),
-  headers: {
-    "Content-Type": "application/json",
-  },
-})
-  .then((response) => response.json())
-  .then((result) => {
-    console.log(result);
-  })
-  .catch((error) => {
+////api////////
+async function postData(url, data) {
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      throw new Error("HTTP error! Status: " + response.status);
+    }
+
+    const responseData = await response.json();
+    console.log("Response:", responseData);
+  } catch (error) {
     console.error("Error:", error);
-  });
+  }
+}
