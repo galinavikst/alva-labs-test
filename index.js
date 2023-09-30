@@ -45,9 +45,9 @@ function getWinners(numArr, boardsArr) {
 }
 
 function getLastScore(winners) {
+  //find first occurrences of indexMain
   const uniqueIndex = {};
   const winnersArr = winners.reduce((accumulator, item) => {
-    //find first occurrences of indexMain
     const index = item.indexMain;
     if (!uniqueIndex.hasOwnProperty(index)) {
       uniqueIndex[index] = true;
@@ -65,13 +65,11 @@ getWinners(drawNum, boards)
   .then((winners) => getLastScore(winners))
   .catch((error) => console.error("Error:", error));
 
-let RESULT;
 async function result() {
   try {
     const winners = await getWinners(drawNumTask, boardsTask);
     const res = getLastScore(winners);
-    RESULT = res;
-    return RESULT;
+    return res;
   } catch (error) {
     console.error("Error:", error);
     return null;
@@ -79,13 +77,13 @@ async function result() {
 }
 
 async function postResult() {
-  await result();
+  const res = await result();
   const h1 = document.querySelector("h1");
-  h1.innerHTML = RESULT;
+  h1.innerHTML = res;
 
   const url = "https://customer-api.krea.se/coding-tests/api/squid-game";
   const data = {
-    answer: RESULT,
+    answer: res,
     name: "Halyna Stepanenko",
   };
   await postData(url, data);
